@@ -8,17 +8,21 @@ import certifi
 app = Flask(__name__)
 CORS(app)
 
-# 1. Define the variable GLOBALLY first (so everyone can see it)
-# Global variables
+# --- GLOBAL VARIABLES ---
 entries_collection = None
-connect_error = "Unknown Error"  # <--- NEW VARIABLE
+connect_error = None
+
+# --- FORCE CONNECTION (Hardcoded) ---
+# We are putting the password directly here to bypass the error
+MONGO_URI = "mongodb+srv://admin:steel2007@msj.ooyv80e.mongodb.net/?retryWrites=true&w=majority&appName=MSJ"
 
 try:
-    mongo_uri = os.environ.get("MONGO_URI")
-    if not mongo_uri:
-        mongo_uri = "mongodb+srv://admin:steeldev2026@msj.ooyv80e.mongodb.net/?retryWrites=true&w=majority&appName=MSJ"
+    print("⏳ Attempting to connect to MongoDB...")
 
-    client = MongoClient(mongo_uri, tlsCAFile=certifi.where())
+    # Connect using the hardcoded string and the certificate fix
+    client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
+
+    # Test the connection immediately
     client.admin.command('ping')
 
     db = client.MSJ
@@ -26,19 +30,23 @@ try:
     print("✅ Successfully connected to MongoDB Atlas!")
 
 except Exception as e:
-    connect_error = str(e)  # <--- SAVE THE ERROR
+    connect_error = str(e)
     print(f"❌ Error connecting to MongoDB: {e}")
 
+
+# --- ROUTES ---
 @app.route('/')
 def home():
-    return "Journal API is Running!"
+    if entries_collection is not None:
+        return "Journal API is LIVE and Connected! 🚀"
+    else:
+        return f"Journal API is Running, but Database Failed: {connect_error}"
 
 
 @app.route('/add', methods=['POST'])
 def add_entry():
-    # Safety Check: Did the database connect?
     if entries_collection is None:
-        return jsonify({"error": f"Database Connection Failed. Reason: {str(connect_error)}"}), 500
+        return jsonify({"error": f"Database Connection Failed. Reason: {connect_error}"}), 500
 
     try:
         data = request.json
@@ -56,9 +64,8 @@ def add_entry():
 
 @app.route('/get', methods=['GET'])
 def get_entries():
-    # Safety Check: Did the database connect?
     if entries_collection is None:
-        return jsonify({"error": "Database not connected"}), 500
+        return jsonify({"error": f"Database Connection Failed. Reason: {connect_error}"}), 500
 
     try:
         all_entries = []
@@ -72,6 +79,5 @@ def get_entries():
 
 
 if __name__ == '__main__':
-    # Use the PORT environment variable for Render
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port)
