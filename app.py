@@ -9,27 +9,25 @@ app = Flask(__name__)
 CORS(app)
 
 # 1. Define the variable GLOBALLY first (so everyone can see it)
+# Global variables
 entries_collection = None
+connect_error = "Unknown Error"  # <--- NEW VARIABLE
 
-# 2. Connect to Database
 try:
-    # Get the password from Render (or use the hardcoded one for local testing)
     mongo_uri = os.environ.get("MONGO_URI")
     if not mongo_uri:
-        # Fallback for local testing
         mongo_uri = "mongodb+srv://admin:steeldev2026@msj.ooyv80e.mongodb.net/?retryWrites=true&w=majority&appName=MSJ"
 
     client = MongoClient(mongo_uri, tlsCAFile=certifi.where())
-    client.admin.command('ping')  # Test connection
+    client.admin.command('ping')
 
     db = client.MSJ
-    # 3. Assign the variable here
     entries_collection = db.journal_entries
     print("✅ Successfully connected to MongoDB Atlas!")
 
 except Exception as e:
+    connect_error = str(e)  # <--- SAVE THE ERROR
     print(f"❌ Error connecting to MongoDB: {e}")
-
 
 @app.route('/')
 def home():
@@ -40,7 +38,7 @@ def home():
 def add_entry():
     # Safety Check: Did the database connect?
     if entries_collection is None:
-        return jsonify({"error": "Database not connected"}), 500
+        return jsonify({"error": f"Database Connection Failed. Reason: {str(connect_error)}"}), 500
 
     try:
         data = request.json
