@@ -1,33 +1,35 @@
+import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
 from datetime import datetime
-import os
-import certifi  # <--- NEW IMPORT
+import certifi
 
 app = Flask(__name__)
 CORS(app)
 
+# 1. Define the variable GLOBALLY first (so everyone can see it)
+entries_collection = None
 
-
-# DELETE the old connection_string = "..." line
-
-# ADD THIS NEW BLOCK:
-# This tells Python to get the secret link from Render settings
-mongo_uri = os.environ.get("MONGO_URI")
-
-if not mongo_uri:
-    # Fallback for local testing (so it still works on your laptop)
-    mongo_uri = "mongodb+srv://admin:steeldev2026@msj.ooyv80e.mongodb.net/?retryWrites=true&w=majority&appName=MSJ"
-
+# 2. Connect to Database
 try:
+    # Get the password from Render (or use the hardcoded one for local testing)
+    mongo_uri = os.environ.get("MONGO_URI")
+    if not mongo_uri:
+        # Fallback for local testing
+        mongo_uri = "mongodb+srv://admin:steeldev2026@msj.ooyv80e.mongodb.net/?retryWrites=true&w=majority&appName=MSJ"
+
     client = MongoClient(mongo_uri, tlsCAFile=certifi.where())
-    client.admin.command('ping') # Test connection immediately
+    client.admin.command('ping')  # Test connection
+
     db = client.MSJ
+    # 3. Assign the variable here
     entries_collection = db.journal_entries
     print("✅ Successfully connected to MongoDB Atlas!")
+
 except Exception as e:
     print(f"❌ Error connecting to MongoDB: {e}")
+
 
 @app.route('/')
 def home():
@@ -36,6 +38,10 @@ def home():
 
 @app.route('/add', methods=['POST'])
 def add_entry():
+    # Safety Check: Did the database connect?
+    if entries_collection is None:
+        return jsonify({"error": "Database not connected"}), 500
+
     try:
         data = request.json
         entry = {
@@ -52,6 +58,10 @@ def add_entry():
 
 @app.route('/get', methods=['GET'])
 def get_entries():
+    # Safety Check: Did the database connect?
+    if entries_collection is None:
+        return jsonify({"error": "Database not connected"}), 500
+
     try:
         all_entries = []
         cursor = entries_collection.find().sort("timestamp", -1).limit(50)
@@ -64,4 +74,6 @@ def get_entries():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Use the PORT environment variable for Render
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
