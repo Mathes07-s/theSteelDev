@@ -8,19 +8,26 @@ import certifi  # <--- NEW IMPORT
 app = Flask(__name__)
 CORS(app)
 
-# Connection String
-connection_string = "mongodb+srv://admin:steeldev2026@msj.ooyv80e.mongodb.net/?retryWrites=true&w=majority&appName=MSJ"
+
+
+# DELETE the old connection_string = "..." line
+
+# ADD THIS NEW BLOCK:
+# This tells Python to get the secret link from Render settings
+mongo_uri = os.environ.get("MONGO_URI")
+
+if not mongo_uri:
+    # Fallback for local testing (so it still works on your laptop)
+    mongo_uri = "mongodb+srv://admin:steeldev2026@msj.ooyv80e.mongodb.net/?retryWrites=true&w=majority&appName=MSJ"
 
 try:
-    # <--- NEW: We added tlsCAFile=certifi.where() to fix the SSL error
-    client = MongoClient(connection_string, tlsCAFile=certifi.where())
-
+    client = MongoClient(mongo_uri, tlsCAFile=certifi.where())
+    client.admin.command('ping') # Test connection immediately
     db = client.MSJ
     entries_collection = db.journal_entries
     print("✅ Successfully connected to MongoDB Atlas!")
 except Exception as e:
     print(f"❌ Error connecting to MongoDB: {e}")
-
 
 @app.route('/')
 def home():
