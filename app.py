@@ -46,15 +46,27 @@ def generate_roadmap():
     try:
         data = request.json
         title = data.get("title")
-        prompt = f"Create a checklist of 5 to 7 short, actionable steps to complete the project: '{title}'. Return ONLY a valid JSON array of strings (e.g., ['Step 1', 'Step 2']). Do not use Markdown."
+
+        # இன்னும் தெளிவான Prompt
+        prompt = f"Create a checklist of 5 short steps for: '{title}'. Return ONLY a JSON list of strings. Example: [\"Step 1\", \"Step 2\"]"
+
+        # புது மாடல் (Flash)
+        model = genai.GenerativeModel('gemini-1.5-flash')
         response = model.generate_content(prompt)
+
         text = response.text.strip()
-        if text.startswith("```json"): text = text.replace("```json", "").replace("```", "")
+        # Clean up JSON formatting (Markdown நீக்குதல்)
+        if text.startswith("```json"):
+            text = text.replace("```json", "").replace("```", "")
+        elif text.startswith("```"):
+            text = text.replace("```", "")
+
         tasks = json.loads(text)
         return jsonify({"tasks": tasks}), 200
     except Exception as e:
-        print(f"🔥 AI Route Error: {e}")  # Render Logs-ல் எரர் தெரியும்
-        return jsonify({"error": str(e), "tasks": ["Plan manually"]}), 500
+        print(f"🔥 AI Route Error: {e}")
+        # எரர் வந்தால் சும்மா விடாமல், அந்த எரரை tasks ஆக காட்டுவோம் (Debug செய்ய ஈஸி)
+        return jsonify({"tasks": [f"Error: {str(e)}"]}), 200
 
 
 @app.route('/create_project', methods=['POST'])
