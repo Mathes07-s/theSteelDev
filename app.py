@@ -60,22 +60,32 @@ def generate_roadmap():
         prompt = f"Create a checklist of 5 short steps for: '{title}'. Return ONLY a JSON list of strings. Example: [\"Step 1\", \"Step 2\"]"
 
         # புது மாடல் (Flash)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(prompt)
+        @app.route('/generate_roadmap', methods=['POST'])
+        def generate_roadmap():
+            try:
+                data = request.json
+                title = data.get("title")
 
-        text = response.text.strip()
-        # Clean up JSON formatting (Markdown நீக்குதல்)
-        if text.startswith("```json"):
-            text = text.replace("```json", "").replace("```", "")
-        elif text.startswith("```"):
-            text = text.replace("```", "")
+                # Prompt
+                prompt = f"Create a checklist of 5 short steps for: '{title}'. Return ONLY a JSON list of strings. Example: [\"Step 1\", \"Step 2\"]"
 
-        tasks = json.loads(text)
-        return jsonify({"tasks": tasks}), 200
-    except Exception as e:
-        print(f"🔥 AI Route Error: {e}")
-        # எரர் வந்தால் சும்மா விடாமல், அந்த எரரை tasks ஆக காட்டுவோம் (Debug செய்ய ஈஸி)
-        return jsonify({"tasks": [f"Error: {str(e)}"]}), 200
+                # 👇 இங்கே தான் மாற்றம்! (gemini-2.0-flash) ✅
+                model = genai.GenerativeModel('gemini-2.0-flash')
+
+                response = model.generate_content(prompt)
+
+                text = response.text.strip()
+                # Clean up JSON formatting
+                if text.startswith("```json"):
+                    text = text.replace("```json", "").replace("```", "")
+                elif text.startswith("```"):
+                    text = text.replace("```", "")
+
+                tasks = json.loads(text)
+                return jsonify({"tasks": tasks}), 200
+            except Exception as e:
+                print(f"🔥 AI Route Error: {e}")
+                return jsonify({"tasks": [f"Error: {str(e)}"]}), 200
 
 
 @app.route('/create_project', methods=['POST'])
