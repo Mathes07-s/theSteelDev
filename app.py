@@ -33,8 +33,16 @@ except Exception as e:
 # Setup AI
 try:
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-pro')
-    print("✅ AI System Ready!")
+
+    # 👇 புது Debug Code: என்ன மாடல் இருக்குனு லிஸ்ட் எடுக்கும்
+    print("🔍 Checking available AI models...")
+    for m in genai.list_models():
+        if 'generateContent' in m.supported_generation_methods:
+            print(f"   👉 Available: {m.name}")
+
+    # நாம் பயன்படுத்தப் போவது
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    print("✅ AI System Ready (Using gemini-1.5-flash)!")
 except Exception as e:
     print(f"❌ AI Setup Failed: {e}")
 
