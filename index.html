@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TheSteelDev AI Planner</title>
-    <script src="[https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js](https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js)"></script>
-    <script src="[https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js](https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js)"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
     <style>
         :root { --bg: #0f0f0f; --card: #1e1e1e; --primary: #bb86fc; --text: #e0e0e0; --success: #03dac6; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
@@ -84,9 +86,11 @@
 
     <script>
         // --- CONFIGURATION ---
-        const API_URL = "https://my-journal-new.onrender.com"; // Your NEW Render URL
+        const API_URL = "https://my-journal-new.onrender.com"; // Your Render URL
+
+        // 👇 இங்கே உங்களின் சரியான FIREBASE KEY இருக்க வேண்டும் (Gemini Key போடாதீங்க!)
         const firebaseConfig = {
-            apiKey: "AIzaSyBcgTlSXNvDNs6U8jwAr_KBOd7uxS0mKO4", // <--- பழைய சரியான Firebase Key
+            apiKey: "AIzaSyCh2xTrbOz3F9uZkMeKlr2g7Pk94TkJMd8", // <--- இதுதான் சரியான Firebase Key
             authDomain: "steeldev-journal.firebaseapp.com",
             projectId: "steeldev-journal",
             storageBucket: "steeldev-journal.firebasestorage.app",
