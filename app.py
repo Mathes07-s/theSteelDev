@@ -12,36 +12,23 @@ app = Flask(__name__)
 CORS(app)
 
 # --- CONFIGURATION ---
-# MongoDB URI-ல் /MSJ என்பதைச் சேர்த்துள்ளேன் (இது மிக முக்கியம்)
-MONGO_URI = "mongodb+srv://admin:ms2007@msj.ooyv80e.mongodb.net/?appName=MSJ"
-# Render செட்டிங்ஸில் இருந்து கீயை எடுக்கும் (பாதுகாப்பானது)
+# Render Environment Variable-ல் இருந்து Key-ஐ எடுக்கும்
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+MONGO_URI = "mongodb+srv://admin:ms2007@msj.ooyv80e.mongodb.net/MSJ?retryWrites=true&w=majority&appName=MSJ"
 
 # Setup DB
-db = None
-projects_collection = None
-
 try:
     client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
-    db = client.get_database("MSJ")  # Database-ஐ நேரடியாக எடுக்கிறோம்
-    projects_collection = db["projects"]  # Collection-ஐ ஒரு அகராதி போல (Dictionary) எடுக்கிறோம்
-    # ஒரு முறை பிங் (Ping) செய்து கனெக்ஷனை உறுதி செய்கிறோம்
-    client.admin.command('ping')
-    print("✅ Database Connected & Verified!")
+    db = client.get_database("MSJ")
+    projects_collection = db["projects"]
+    print("✅ Database Connected!")
 except Exception as e:
-    print(f"❌ Database Connection Failed: {e}")
+    print(f"❌ Database Error: {e}")
 
 # Setup AI
 try:
     genai.configure(api_key=GEMINI_API_KEY)
-
-    # 👇 புது Debug Code: என்ன மாடல் இருக்குனு லிஸ்ட் எடுக்கும்
-    print("🔍 Checking available AI models...")
-    for m in genai.list_models():
-        if 'generateContent' in m.supported_generation_methods:
-            print(f"   👉 Available: {m.name}")
-
-    # நாம் பயன்படுத்தப் போவது
+    # நாம் பயன்படுத்தப் போவது Gemini 2.0 Flash
     model = genai.GenerativeModel('gemini-2.0-flash')
     print("✅ AI System Ready (Using gemini-2.0-flash)!")
 except Exception as e:
@@ -50,50 +37,42 @@ except Exception as e:
 
 # --- ROUTES ---
 
+@app.route('/')
+def home():
+    return "SteelDev AI Server is Running! 🚀"
+
+
 @app.route('/generate_roadmap', methods=['POST'])
 def generate_roadmap():
     try:
         data = request.json
         title = data.get("title")
 
-        # இன்னும் தெளிவான Prompt
+        # Prompt
         prompt = f"Create a checklist of 5 short steps for: '{title}'. Return ONLY a JSON list of strings. Example: [\"Step 1\", \"Step 2\"]"
 
-        # புது மாடல் (Flash)
-        @app.route('/generate_roadmap', methods=['POST'])
-        def generate_roadmap():
-            try:
-                data = request.json
-                title = data.get("title")
+        # AI-ஐ அழைப்பது
+        response = model.generate_content(prompt)
 
-                # Prompt
-                prompt = f"Create a checklist of 5 short steps for: '{title}'. Return ONLY a JSON list of strings. Example: [\"Step 1\", \"Step 2\"]"
+        text = response.text.strip()
+        # Clean JSON formatting
+        if text.startswith("```json"):
+            text = text.replace("```json", "").replace("```", "")
+        elif text.startswith("```"):
+            text = text.replace("```", "")
 
-                # 👇 இங்கே தான் மாற்றம்! (gemini-2.0-flash) ✅
-                model = genai.GenerativeModel('gemini-2.0-flash')
+        tasks = json.loads(text)
+        return jsonify({"tasks": tasks}), 200
 
-                response = model.generate_content(prompt)
-
-                text = response.text.strip()
-                # Clean up JSON formatting
-                if text.startswith("```json"):
-                    text = text.replace("```json", "").replace("```", "")
-                elif text.startswith("```"):
-                    text = text.replace("```", "")
-
-                tasks = json.loads(text)
-                return jsonify({"tasks": tasks}), 200
-            except Exception as e:
-                print(f"🔥 AI Route Error: {e}")
-                return jsonify({"tasks": [f"Error: {str(e)}"]}), 200
+    except Exception as e:  # <--- நீங்க மிஸ் பண்ணது இதுதான்!
+        print(f"🔥 AI Route Error: {e}")
+        # AI எரர் வந்தாலும் ஆப் நிற்காது
+        return jsonify({"tasks": [f"Error: {str(e)}", "Plan Manually"]}), 200
 
 
 @app.route('/create_project', methods=['POST'])
 def create_project():
     try:
-        if projects_collection is None:
-            raise Exception("Database collection not initialized")
-
         data = request.json
         new_project = {
             "user_email": data.get("user"),
@@ -106,16 +85,12 @@ def create_project():
         result = projects_collection.insert_one(new_project)
         return jsonify({"message": "Project Created!", "id": str(result.inserted_id)}), 201
     except Exception as e:
-        print(f"🔥 Create Project Error: {e}")  # இதுதான் 500 எரருக்கான காரணம்
         return jsonify({"error": str(e)}), 500
 
 
 @app.route('/get_projects', methods=['GET'])
 def get_projects():
     try:
-        if projects_collection is None:
-            return jsonify([]), 200  # DB இல்லை என்றால் வெற்று லிஸ்ட் அனுப்பு
-
         user_email = request.args.get('user')
         projects = []
         cursor = projects_collection.find({"user_email": user_email}).sort("created_at", -1)
@@ -124,11 +99,9 @@ def get_projects():
             projects.append(doc)
         return jsonify(projects), 200
     except Exception as e:
-        print(f"🔥 Get Projects Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 
-# Task Update Route (ObjectId கையாளுதல்)
 @app.route('/update_task', methods=['POST'])
 def update_task():
     try:
@@ -138,23 +111,22 @@ def update_task():
         is_done = data.get("is_done")
 
         project = projects_collection.find_one({"_id": ObjectId(project_id)})
-        if not project: return jsonify({"error": "Not found"}), 404
+        if project:
+            tasks = project.get("tasks", [])
+            if 0 <= task_index < len(tasks):
+                tasks[task_index]["done"] = is_done
 
-        tasks = project.get("tasks", [])
-        if 0 <= task_index < len(tasks):
-            tasks[task_index]["done"] = is_done
+            total = len(tasks)
+            completed = sum(1 for t in tasks if t["done"])
+            progress = int((completed / total) * 100) if total > 0 else 0
 
-        total = len(tasks)
-        completed = sum(1 for t in tasks if t["done"])
-        new_progress = int((completed / total) * 100) if total > 0 else 0
-
-        projects_collection.update_one(
-            {"_id": ObjectId(project_id)},
-            {"$set": {"tasks": tasks, "progress": new_progress}}
-        )
-        return jsonify({"progress": new_progress}), 200
+            projects_collection.update_one(
+                {"_id": ObjectId(project_id)},
+                {"$set": {"tasks": tasks, "progress": progress}}
+            )
+            return jsonify({"progress": progress}), 200
+        return jsonify({"error": "Not found"}), 404
     except Exception as e:
-        print(f"🔥 Update Task Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 
