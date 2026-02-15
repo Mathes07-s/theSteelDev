@@ -166,6 +166,10 @@
             const res = await fetch(`${API_URL}/get_projects?user=${currentUserEmail}`);
             const projects = await res.json();
 
+            if (projects.error || !Array.isArray(projects)) {
+                console.error("Backend Error:", projects.error);
+                return;
+            }
             const list = document.getElementById('projects-list');
             list.innerHTML = "";
 
