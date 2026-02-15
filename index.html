@@ -3,89 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TheSteelDev AI Planner</title>
+    <title>My Personal Journal</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <style>
-        :root { --bg: #0f0f0f; --card: #1e1e1e; --primary: #bb86fc; --text: #e0e0e0; --success: #03dac6; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        body { font-family: sans-serif; background: #121212; color: #fff; text-align: center; padding: 20px; }
+        .hidden { display: none; }
 
-        /* Dashboard Grid */
-        .container { max-width: 800px; margin: 0 auto; }
-        h1 { text-align: center; color: var(--primary); }
+        /* Login Button */
+        .btn { padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 5px; margin: 10px; }
+        .btn-google { background: #4285F4; color: white; }
+        .btn-save { background: #03dac6; color: black; font-weight: bold; width: 100%; max-width: 500px; }
+        .btn-logout { background: #cf6679; color: white; font-size: 12px; }
 
-        /* Floating Add Button */
-        .fab { position: fixed; bottom: 30px; right: 30px; background: var(--primary); color: #000; width: 60px; height: 60px; border-radius: 50%; font-size: 30px; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(187,134,252,0.4); display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }
-        .fab:hover { transform: scale(1.1); }
+        /* Input Area */
+        textarea { width: 100%; max-width: 500px; height: 100px; background: #1e1e1e; color: #fff; border: 1px solid #333; padding: 10px; border-radius: 10px; margin-bottom: 10px; font-size: 16px; }
 
-        /* Project Card Style */
-        .project-card { background: var(--card); padding: 20px; border-radius: 15px; margin-bottom: 20px; border-left: 5px solid var(--primary); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .progress-bar-bg { background: #333; height: 8px; border-radius: 4px; overflow: hidden; margin: 10px 0; }
-        .progress-bar-fill { height: 100%; background: var(--success); width: 0%; transition: width 0.5s ease; }
-
-        /* Checklist Items */
-        .task-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #333; }
-        .task-item input[type="checkbox"] { transform: scale(1.2); accent-color: var(--success); }
-        .task-item.done span { text-decoration: line-through; color: #777; }
-
-        /* Modal (Popup) */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; }
-        .modal-content { background: var(--card); padding: 25px; border-radius: 15px; width: 90%; max-width: 400px; text-align: center; }
-        input[type="text"] { width: 100%; padding: 12px; margin: 10px 0; background: #333; border: 1px solid #555; color: white; border-radius: 5px; box-sizing: border-box; }
-        .ai-toggle { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 15px 0; color: var(--success); font-weight: bold; }
-
-        .btn { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin: 5px; }
-        .btn-save { background: var(--success); color: #000; }
-        .btn-cancel { background: #333; color: white; }
-
-        /* Login Screen */
-        #login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
-        .hidden { display: none !important; }
+        /* Entries List */
+        .entry-card { background: #1e1e1e; padding: 15px; margin: 10px auto; max-width: 500px; border-radius: 10px; text-align: left; border-left: 4px solid #bb86fc; }
+        .entry-time { font-size: 12px; color: #888; margin-bottom: 5px; }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <h1>🔐 SteelDev OS</h1>
-        <p>Login to access your workspace</p>
-        <button class="btn btn-save" onclick="loginWithGoogle()">Sign in with Google</button>
+        <h1>📔 My Journal</h1>
+        <p>Private & Secure</p>
+        <button class="btn btn-google" onclick="login()">Sign in with Google</button>
     </div>
 
-    <div id="dashboard" class="container hidden">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2>🚀 My Projects</h2>
-            <button class="btn btn-cancel" onclick="logout()" style="font-size: 12px;">Logout</button>
+    <div id="app-screen" class="hidden">
+        <div style="display:flex; justify-content:space-between; max-width:500px; margin:0 auto;">
+            <h3>👋 Hello!</h3>
+            <button class="btn btn-logout" onclick="logout()">Logout</button>
         </div>
 
-        <div id="projects-list">
-            <p style="text-align: center; color: #777;">Loading projects...</p>
-        </div>
+        <textarea id="noteInput" placeholder="What's on your mind today?"></textarea>
+        <br>
+        <button class="btn btn-save" onclick="saveEntry()">SAVE NOTE</button>
 
-        <button class="fab" onclick="openModal()">+</button>
-    </div>
-
-    <div id="modal" class="modal">
-        <div class="modal-content">
-            <h3>New Mission</h3>
-            <input type="text" id="projTitle" placeholder="Ex: Learn Python, Build Gym Body...">
-
-            <div class="ai-toggle">
-                <input type="checkbox" id="aiCheck" checked>
-                <label for="aiCheck">✨ Generate Roadmap with AI</label>
-            </div>
-
-            <div id="loadingAI" style="display:none; color: var(--primary); margin-bottom: 10px;">🤖 AI is thinking...</div>
-
-            <button class="btn btn-save" onclick="createProject()">Create</button>
-            <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+        <div id="entries-list">
+            <p>Loading entries...</p>
         </div>
     </div>
 
     <script>
-        // --- CONFIGURATION ---
-        const API_URL = "https://my-journal-new.onrender.com"; // Your NEW Render URLconst firebaseConfig = {
-            apiKey: "AIzaSyCh2xTrbOz3F9uZkMeKlr2g7Pk94TkJMd8",  // <--- பழைய சரியான Firebase Key
+        // 👇 உங்களின் சரியான Render URL
+        const API_URL = "https://my-journal-new.onrender.com";
+
+        // 👇 உங்களின் சரியான Firebase Config (பழையது)
+        const firebaseConfig = {
+            apiKey: "AIzaSyCh2xTrbOz3F9uZkMeKlr2g7Pk94TkJMd8",
             authDomain: "steeldev-journal.firebaseapp.com",
             projectId: "steeldev-journal",
             storageBucket: "steeldev-journal.firebasestorage.app",
@@ -93,134 +61,72 @@
             appId: "1:923272289095:web:289dcf21213c497b808a62"
         };
 
-        // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const provider = new firebase.auth.GoogleAuthProvider();
-        let currentUserEmail = "";
+        let userEmail = "";
 
-        // --- AUTH ---
-        function loginWithGoogle() { auth.signInWithPopup(provider); }
+        // --- LOGIN LOGIC ---
+        function login() { auth.signInWithPopup(provider); }
         function logout() { auth.signOut(); }
 
         auth.onAuthStateChanged(user => {
             if (user) {
-                currentUserEmail = user.email;
+                userEmail = user.email;
                 document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('dashboard').classList.remove('hidden');
-                loadProjects();
+                document.getElementById('app-screen').classList.remove('hidden');
+                loadEntries(); // லாகின் ஆனதும் பழையதை காட்டு
             } else {
                 document.getElementById('login-screen').classList.remove('hidden');
-                document.getElementById('dashboard').classList.add('hidden');
+                document.getElementById('app-screen').classList.add('hidden');
             }
         });
 
-        // --- CORE FUNCTIONS ---
+        // --- SAVE ENTRY ---
+        async function saveEntry() {
+            const content = document.getElementById('noteInput').value;
+            if (!content) return alert("Please type something!");
 
-        // 1. Create Project (Calls AI if checked)
-        async function createProject() {
-            const title = document.getElementById('projTitle').value;
-            const useAI = document.getElementById('aiCheck').checked;
+            const res = await fetch(`${API_URL}/add_entry`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user: userEmail, content: content })
+            });
 
-            if(!title) return alert("Enter a title!");
-
-            document.getElementById('loadingAI').style.display = 'block';
-            let tasks = [];
-
-            if (useAI) {
-                try {
-                    // Call Backend to ask Gemini
-                    const res = await fetch(`${API_URL}/generate_roadmap`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ title: title })
-                    });
-                    const data = await res.json();
-                    tasks = data.tasks;
-                } catch (e) {
-                    alert("AI Error, creating manual project.");
-                    tasks = ["Step 1 (Add details)"];
-                }
+            if (res.ok) {
+                document.getElementById('noteInput').value = ""; // Clear box
+                loadEntries(); // Refresh list
             } else {
-                tasks = ["Start Project"];
+                alert("Error saving!");
             }
-
-            // Save Final Project to DB
-            await fetch(`${API_URL}/create_project`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    user: currentUserEmail,
-                    title: title,
-                    tasks: tasks,
-                    color: getRandomColor()
-                })
-            });
-
-            closeModal();
-            loadProjects(); // Refresh UI
         }
 
-        // 2. Load Projects
-        async function loadProjects() {
-            const res = await fetch(`${API_URL}/get_projects?user=${currentUserEmail}`);
-            const projects = await res.json();
+        // --- LOAD ENTRIES ---
+        async function loadEntries() {
+            try {
+                const res = await fetch(`${API_URL}/get_entries?user=${userEmail}`);
+                const entries = await res.json();
 
-            if (projects.error || !Array.isArray(projects)) {
-                console.error("Backend Error:", projects.error);
-                return;
-            }
-            const list = document.getElementById('projects-list');
-            list.innerHTML = "";
+                const list = document.getElementById('entries-list');
+                list.innerHTML = "";
 
-            projects.forEach(p => {
-                // Calculate Checklist HTML
-                let tasksHtml = "";
-                p.tasks.forEach((t, index) => {
-                    const checked = t.done ? "checked" : "";
-                    const doneClass = t.done ? "done" : "";
-                    tasksHtml += `
-                        <div class="task-item ${doneClass}">
-                            <input type="checkbox" ${checked} onchange="toggleTask('${p._id}', ${index}, this.checked)">
-                            <span>${t.text}</span>
-                        </div>`;
+                if (entries.length === 0) {
+                    list.innerHTML = "<p style='color:#555'>No entries yet. Write something!</p>";
+                    return;
+                }
+
+                entries.forEach(entry => {
+                    list.innerHTML += `
+                        <div class="entry-card">
+                            <div class="entry-time">${entry.date} at ${entry.time}</div>
+                            <div>${entry.content}</div>
+                        </div>
+                    `;
                 });
-
-                list.innerHTML += `
-                    <div class="project-card" style="border-left-color: ${p.color}">
-                        <div class="card-header">
-                            <h3>${p.title}</h3>
-                            <span style="font-size: 20px; font-weight:bold; color: ${p.color}">${p.progress}%</span>
-                        </div>
-                        <div class="progress-bar-bg">
-                            <div class="progress-bar-fill" style="width: ${p.progress}%; background: ${p.color}"></div>
-                        </div>
-                        <div class="tasks-container">
-                            ${tasksHtml}
-                        </div>
-                    </div>
-                `;
-            });
+            } catch (e) {
+                console.error("Error loading:", e);
+            }
         }
-
-        // 3. Update Task Status
-        async function toggleTask(projectId, taskIndex, isDone) {
-            await fetch(`${API_URL}/update_task`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    project_id: projectId,
-                    task_index: taskIndex,
-                    is_done: isDone
-                })
-            });
-            loadProjects(); // Refresh to update progress bar
-        }
-
-        // Utils
-        function openModal() { document.getElementById('modal').style.display = 'flex'; document.getElementById('loadingAI').style.display = 'none'; document.getElementById('projTitle').value = ""; }
-        function closeModal() { document.getElementById('modal').style.display = 'none'; }
-        function getRandomColor() { const colors = ['#ff7597', '#bb86fc', '#03dac6', '#ffb74d']; return colors[Math.floor(Math.random() * colors.length)]; }
     </script>
 </body>
 </html>
