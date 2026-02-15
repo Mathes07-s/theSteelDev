@@ -14,7 +14,8 @@ CORS(app)
 # --- CONFIGURATION ---
 # MongoDB URI-ல் /MSJ என்பதைச் சேர்த்துள்ளேன் (இது மிக முக்கியம்)
 MONGO_URI = "mongodb+srv://admin:ms2007@msj.ooyv80e.mongodb.net/?appName=MSJ"
-GEMINI_API_KEY = "AIzaSyBcgTlSXNvDNs6U8jwAr_KBOd7uxS0mKO4"
+# Render செட்டிங்ஸில் இருந்து கீயை எடுக்கும் (பாதுகாப்பானது)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 # Setup DB
 db = None
