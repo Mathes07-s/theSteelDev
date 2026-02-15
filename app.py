@@ -1,84 +1,133 @@
 import os
+import json
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
 from datetime import datetime
 import certifi
+from bson.objectid import ObjectId
+import google.generativeai as genai
 
 app = Flask(__name__)
 CORS(app)
 
-# --- GLOBAL VARIABLES ---
-entries_collection = None
-connect_error = None
+# --- CONFIGURATION ---
+# 1. MongoDB Connection
+MONGO_URI = "mongodb+srv://admin:steeldev2026@msj.ooyv80e.mongodb.net/?retryWrites=true&w=majority&appName=MSJ"
+# 2. Gemini AI Configuration (Using your provided key)
+GEMINI_API_KEY = "AIzaSyBcgTlSXNvDNs6U8jwAr_KBOd7uxS0mKO4"
 
-# --- FORCE CONNECTION (Hardcoded) ---
-# We are putting the password directly here to bypass the error
-MONGO_URI = "mongodb+srv://admin:steel2007@msj.ooyv80e.mongodb.net/?retryWrites=true&w=majority&appName=MSJ"
-
+# Setup DB
 try:
-    print("⏳ Attempting to connect to MongoDB...")
-
-    # Connect using the hardcoded string and the certificate fix
     client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
-
-    # Test the connection immediately
-    client.admin.command('ping')
-
     db = client.MSJ
-    entries_collection = db.journal_entries
-    print("✅ Successfully connected to MongoDB Atlas!")
-
+    projects_collection = db.projects
+    print("✅ Database Connected!")
 except Exception as e:
-    connect_error = str(e)
-    print(f"❌ Error connecting to MongoDB: {e}")
+    print(f"❌ Database Error: {e}")
+
+# Setup AI
+try:
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel('gemini-pro')
+    print("✅ AI System Ready!")
+except Exception as e:
+    print(f"❌ AI Error: {e}")
 
 
 # --- ROUTES ---
+
 @app.route('/')
 def home():
-    if entries_collection is not None:
-        return "Journal API is LIVE and Connected! 🚀"
-    else:
-        return f"Journal API is Running, but Database Failed: {connect_error}"
+    return "TheSteelDev AI Server is Running! 🚀"
 
 
-@app.route('/add', methods=['POST'])
-def add_entry():
-    if entries_collection is None:
-        return jsonify({"error": f"Database Connection Failed. Reason: {connect_error}"}), 500
-
+# 1. AI ROADMAP GENERATOR (The Magic Feature)
+@app.route('/generate_roadmap', methods=['POST'])
+def generate_roadmap():
     try:
         data = request.json
-        entry = {
-            "content": data.get("content"),
-            "user_email": data.get("user"),  # <--- NEW: Stores your Google Email
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        title = data.get("title")
+
+        # Ask AI to create a plan
+        prompt = f"Create a checklist of 5 to 7 short, actionable steps to complete the project: '{title}'. Return ONLY a valid JSON array of strings (e.g., ['Step 1', 'Step 2']). Do not use Markdown."
+
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+
+        # Clean up AI response to ensure it's valid JSON
+        if text.startswith("```json"): text = text.replace("```json", "").replace("```", "")
+        tasks = json.loads(text)
+
+        return jsonify({"tasks": tasks})
+    except Exception as e:
+        return jsonify({"error": str(e), "tasks": ["Plan manually (AI Error)"]})
+
+
+# 2. CREATE PROJECT (Save to DB)
+@app.route('/create_project', methods=['POST'])
+def create_project():
+    try:
+        data = request.json
+        new_project = {
+            "user_email": data.get("user"),
+            "title": data.get("title"),
+            "color": data.get("color", "#bb86fc"),
+            "tasks": [{"text": t, "done": False} for t in data.get("tasks", [])],  # Store tasks with status
+            "progress": 0,
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
-        result = entries_collection.insert_one(entry)
-        return jsonify({"message": "Saved successfully!", "id": str(result.inserted_id)}), 201
+        result = projects_collection.insert_one(new_project)
+        return jsonify({"message": "Project Created!", "id": str(result.inserted_id)}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/get', methods=['GET'])
-def get_entries():
-    if entries_collection is None:
-        return jsonify({"error": f"Database Connection Failed. Reason: {connect_error}"}), 500
-
+# 3. GET PROJECTS (Load Dashboard)
+@app.route('/get_projects', methods=['GET'])
+def get_projects():
     try:
-        # Get the email from the URL (e.g., /get?user=example@gmail.com)
         user_email = request.args.get('user')
-
-        # Filter: Only find notes that belong to THIS user
-        query = {"user_email": user_email} if user_email else {}
-
-        all_entries = []
-        cursor = entries_collection.find(query).sort("timestamp", -1).limit(50)
+        projects = []
+        cursor = projects_collection.find({"user_email": user_email}).sort("created_at", -1)
         for doc in cursor:
             doc['_id'] = str(doc['_id'])
-            all_entries.append(doc)
-        return jsonify(all_entries), 200
+            projects.append(doc)
+        return jsonify(projects), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# 4. UPDATE TASK STATUS (Check/Uncheck)
+@app.route('/update_task', methods=['POST'])
+def update_task():
+    try:
+        data = request.json
+        project_id = data.get("project_id")
+        task_index = data.get("task_index")
+        is_done = data.get("is_done")
+
+        # 1. Get the project
+        project = projects_collection.find_one({"_id": ObjectId(project_id)})
+        if not project: return jsonify({"error": "Project not found"}), 404
+
+        # 2. Update the specific task
+        tasks = project.get("tasks", [])
+        if 0 <= task_index < len(tasks):
+            tasks[task_index]["done"] = is_done
+
+        # 3. Recalculate Progress %
+        total = len(tasks)
+        completed = sum(1 for t in tasks if t["done"])
+        new_progress = int((completed / total) * 100) if total > 0 else 0
+
+        # 4. Save back to DB
+        projects_collection.update_one(
+            {"_id": ObjectId(project_id)},
+            {"$set": {"tasks": tasks, "progress": new_progress}}
+        )
+
+        return jsonify({"progress": new_progress, "message": "Updated!"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
