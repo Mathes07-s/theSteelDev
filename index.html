@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TheSteelDev Journal</title>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <style>
+        :root { --bg: #121212; --card: #1e1e1e; --primary: #bb86fc; --text: #e0e0e0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .container { background: var(--card); padding: 2rem; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 90%; max-width: 500px; }
+        h2 { color: var(--primary); text-align: center; margin-bottom: 1.5rem; }
+        textarea { width: 100%; height: 150px; background: #2c2c2c; color: white; border: 1px solid #444; border-radius: 8px; padding: 10px; box-sizing: border-box; resize: none; font-size: 16px; margin-bottom: 1rem; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-bottom: 0.5rem; font-size: 16px; }
+        .btn-primary { background: var(--primary); color: #000; }
+        .btn-secondary { background: #333; color: white; border: 1px solid #555; }
+        #micBtn.listening { background: #cf6679; color: white; }
+        .entry { background: #252525; padding: 15px; border-radius: 8px; margin-top: 10px; border-left: 4px solid var(--primary); }
+        .entry-date { font-size: 12px; color: #888; margin-bottom: 5px; }
+        #login-screen { text-align: center; }
+        .hidden { display: none; }
+        .controls { display: flex; gap: 10px; margin-bottom: 10px; }
+        select { background: #333; color: white; border: 1px solid #555; border-radius: 5px; padding: 5px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div id="login-screen">
+            <h2>🔐 TheSteelDev Journal</h2>
+            <p>Welcome back! Please sign in to view your private logs.</p>
+            <button class="btn-primary" onclick="loginWithGoogle()">Sign in with Google</button>
+        </div>
+
+        <div id="journal-screen" class="hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>📝 TheSteelDev</h2>
+                <button onclick="logout()" style="width: auto; padding: 5px 10px; font-size: 12px;">Logout</button>
+            </div>
+
+            <div class="controls">
+                <select id="langSelect">
+                    <option value="ta-IN">Tamil</option>
+                    <option value="en-IN">English (India)</option>
+                </select>
+                <button id="micBtn" class="btn-secondary" onclick="toggleVoice()" style="flex-grow: 1; margin: 0;">🎙️ Tap to Speak</button>
+            </div>
+
+            <textarea id="journalContent" placeholder="Speak or type your thoughts..."></textarea>
+            <button class="btn-primary" onclick="saveEntry()">Save Entry</button>
+            <p id="status" style="text-align: center; font-size: 14px;"></p>
+
+            <div id="entriesList">
+                </div>
+        </div>
+    </div>
+
+    <script>
+        // 1. CONFIGURATION
+        const API_URL = "https://steeldev-journal.onrender.com"; //
+        const firebaseConfig = {
+            apiKey: "AIzaSyCh2xTrbOz3F9uZkMeKlr2g7Pk94TkJMd8",
+            authDomain: "steeldev-journal.firebaseapp.com",
+            projectId: "steeldev-journal",
+            storageBucket: "steeldev-journal.firebasestorage.app",
+            messagingSenderId: "923272289095",
+            appId: "1:923272289095:web:289dcf21213c497b808a62"
+        }; //
+
+        // 2. INITIALIZE FIREBASE
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const provider = new firebase.auth.GoogleAuthProvider();
+
+        // 3. AUTH LOGIC
+        function loginWithGoogle() { auth.signInWithPopup(provider).catch(e => alert(e.message)); }
+        function logout() { auth.signOut(); }
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('journal-screen').classList.remove('hidden');
+                loadEntries();
+            } else {
+                document.getElementById('login-screen').classList.remove('hidden');
+                document.getElementById('journal-screen').classList.add('hidden');
+            }
+        });
+
+        // 4. VOICE LOGIC (TAMIL/ENGLISH)
+        let recognition;
+        let isListening = false;
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.onstart = () => {
+                isListening = true;
+                document.getElementById('micBtn').innerText = "🔴 Listening...";
+                document.getElementById('micBtn').classList.add('listening');
+            };
+            recognition.onend = () => {
+                isListening = false;
+                document.getElementById('micBtn').innerText = "🎙️ Tap to Speak";
+                document.getElementById('micBtn').classList.remove('listening');
+            };
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById('journalContent').value += " " + transcript;
+            };
+        }
+
+        function toggleVoice() {
+            if (isListening) { recognition.stop(); }
+            else {
+                recognition.lang = document.getElementById('langSelect').value;
+                recognition.start();
+            }
+        }
+
+        // 5. DATABASE LOGIC
+        async function saveEntry() {
+            const content = document.getElementById('journalContent').value;
+            const status = document.getElementById('status');
+            if (!content) return;
+            status.innerText = "⏳ Saving...";
+            try {
+                const res = await fetch(`${API_URL}/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: content, user: auth.currentUser.email })
+                });
+                if (res.ok) {
+                    status.innerText = "✅ Saved to Cloud!";
+                    document.getElementById('journalContent').value = "";
+                    loadEntries();
+                } else { throw new Error(); }
+            } catch (e) { status.innerText = "❌ Error saving entry."; }
+        }
+
+        async function loadEntries() {
+            try {
+                const userEmail = auth.currentUser.email;
+                const res = await fetch(`${API_URL}/get?user=${userEmail}`);
+                const data = await res.json();
+                const list = document.getElementById('entriesList');
+                list.innerHTML = "";
+                data.forEach(entry => {
+                    list.innerHTML += `
+                        <div class="entry">
+                            <div class="entry-date">${entry.timestamp}</div>
+                            <div>${entry.content}</div>
+                        </div>`;
+                });
+            } catch (e) { console.error("Could not load entries"); }
+        }
+    </script>
+</body>
+</html>
