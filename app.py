@@ -42,8 +42,8 @@ try:
             print(f"   👉 Available: {m.name}")
 
     # நாம் பயன்படுத்தப் போவது
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    print("✅ AI System Ready (Using gemini-1.5-flash)!")
+    model = genai.GenerativeModel('gemini-2.0-flash')
+    print("✅ AI System Ready (Using gemini-2.0-flash)!")
 except Exception as e:
     print(f"❌ AI Setup Failed: {e}")
 
